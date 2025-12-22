@@ -2,9 +2,14 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Lead, SearchResult } from "../types";
 
-const API_KEY = process.env.API_KEY || '';
+// @ts-ignore
+const API_KEY = (typeof process !== 'undefined' ? process.env.API_KEY : '') || '';
 
 export const searchLeads = async (query: string, location?: string): Promise<SearchResult> => {
+  if (!API_KEY) {
+    console.error("API_KEY não encontrada no ambiente.");
+  }
+  
   const ai = new GoogleGenAI({ apiKey: API_KEY });
   const fullPrompt = `Encontre empresas, estabelecimentos comerciais, condomínios ou instituições do ramo de "${query}" na região de "${location || 'Brasil'}". 
   O objetivo é identificar potenciais compradores de materiais de limpeza em larga escala.
