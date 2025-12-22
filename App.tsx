@@ -1,1 +1,0 @@
-// Lógica movida para pages/index.tsx conforme padrão Next.js.

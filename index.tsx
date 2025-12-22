@@ -1,1 +1,0 @@
-// Arquivo desativado. O Next.js gerencia a entrada automaticamente via pasta pages.
