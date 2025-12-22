@@ -61,6 +61,14 @@ const App: React.FC = () => {
     );
   };
 
+  const handleUpdateLead = (updatedLead: Lead) => {
+    setLeads(prevLeads => 
+      prevLeads.map(lead => 
+        lead.id === updatedLead.id ? updatedLead : lead
+      )
+    );
+  };
+
   const handleGenerateScript = async (lead: Lead) => {
     setSelectedLead(lead);
     setOutreachMsg('Gerando script personalizado com foco em inovação e qualidade...');
@@ -185,6 +193,7 @@ const App: React.FC = () => {
               onAction={handleGenerateScript} 
               onStatusChange={handleStatusChange}
               onNotesChange={handleNotesChange}
+              onUpdate={handleUpdateLead}
             />
           ))}
         </div>
@@ -192,10 +201,10 @@ const App: React.FC = () => {
 
       {selectedLead && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-2xl w-full shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
-            <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-blue-50/50">
+          <div className="bg-white rounded-3xl max-w-2xl w-full shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
+            <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-blue-50/50 shrink-0">
               <div>
-                <h3 className="text-2xl font-bold text-slate-800">{selectedLead.name}</h3>
+                <h3 className="text-2xl font-bold text-slate-800 truncate max-w-[400px]">{selectedLead.name}</h3>
                 <p className="text-blue-600 font-medium">Abordagem de Inovação e Qualidade</p>
               </div>
               <button 
@@ -205,14 +214,39 @@ const App: React.FC = () => {
                 ✕
               </button>
             </div>
-            <div className="p-8 space-y-6">
+            <div className="p-8 space-y-6 overflow-y-auto custom-scrollbar">
               <div>
-                <h4 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-3">Mensagem de Abordagem</h4>
+                <h4 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-3">Dados do Cliente</h4>
+                <div className="grid grid-cols-2 gap-4 text-sm text-slate-600 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                  <div>
+                    <span className="font-bold text-slate-400 uppercase text-[10px] block mb-1">Tipo</span>
+                    <p>{selectedLead.businessType}</p>
+                  </div>
+                  <div>
+                    <span className="font-bold text-slate-400 uppercase text-[10px] block mb-1">Local</span>
+                    <p>{selectedLead.location}</p>
+                  </div>
+                  <div>
+                    <span className="font-bold text-slate-400 uppercase text-[10px] block mb-1">Match</span>
+                    <p className="text-blue-600 font-bold">{selectedLead.score}%</p>
+                  </div>
+                  {selectedLead.phone && (
+                    <div>
+                      <span className="font-bold text-slate-400 uppercase text-[10px] block mb-1">Telefone</span>
+                      <p>{selectedLead.phone}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <h4 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-3">Mensagem de Abordagem Sugerida</h4>
                 <div className="bg-slate-50 border border-slate-200 p-6 rounded-2xl whitespace-pre-wrap text-slate-700 leading-relaxed italic">
                   "{outreachMsg}"
                 </div>
               </div>
-              <div className="flex gap-4">
+
+              <div className="flex gap-4 shrink-0 pb-2">
                 <button 
                   onClick={() => {
                     navigator.clipboard.writeText(outreachMsg);
@@ -223,7 +257,7 @@ const App: React.FC = () => {
                   Copiar Texto
                 </button>
                 <a 
-                  href={`https://wa.me/?text=${encodeURIComponent(outreachMsg)}`}
+                  href={`https://wa.me/${selectedLead.phone?.replace(/\D/g, '')}?text=${encodeURIComponent(outreachMsg)}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex-1 bg-green-500 text-white font-bold py-4 rounded-2xl hover:bg-green-600 transition-colors text-center"

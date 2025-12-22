@@ -7,12 +7,21 @@ interface LeadCardProps {
   onAction: (lead: Lead) => void;
   onStatusChange: (id: string, newStatus: Lead['status']) => void;
   onNotesChange: (id: string, notes: string) => void;
+  onUpdate: (updatedLead: Lead) => void;
 }
 
-const LeadCard: React.FC<LeadCardProps> = ({ lead, onAction, onStatusChange, onNotesChange }) => {
+const LeadCard: React.FC<LeadCardProps> = ({ lead, onAction, onStatusChange, onNotesChange, onUpdate }) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState({
+    name: lead.name,
+    businessType: lead.businessType,
+    location: lead.location,
+    phone: lead.phone || ''
+  });
+  
   const [localNotes, setLocalNotes] = useState(lead.notes || '');
-  const [isSaving, setIsSaving] = useState(false);
-  const [showSuccess, setShowSuccess] = useState(false);
+  const [isSavingNotes, setIsSavingNotes] = useState(false);
+  const [showSuccessNotes, setShowSuccessNotes] = useState(false);
 
   const getStatusStyles = (status: string) => {
     switch (status) {
@@ -28,28 +37,109 @@ const LeadCard: React.FC<LeadCardProps> = ({ lead, onAction, onStatusChange, onN
   const statusOptions: Lead['status'][] = ['Novo', 'Em Contato', 'Negociando', 'Fechado', 'Perdido'];
 
   const handleSaveNotes = () => {
-    setIsSaving(true);
+    setIsSavingNotes(true);
     onNotesChange(lead.id, localNotes);
     
-    // Simulate API delay and show success
     setTimeout(() => {
-      setIsSaving(false);
-      setShowSuccess(true);
-      // Hide success after 2 seconds
-      setTimeout(() => setShowSuccess(false), 2000);
+      setIsSavingNotes(false);
+      setShowSuccessNotes(true);
+      setTimeout(() => setShowSuccessNotes(false), 2000);
     }, 400);
+  };
+
+  const handleSaveEdit = () => {
+    onUpdate({
+      ...lead,
+      ...editForm
+    });
+    setIsEditing(false);
   };
 
   const cleanPhone = lead.phone ? lead.phone.replace(/\D/g, '') : '';
   const waUrl = cleanPhone ? `https://wa.me/${cleanPhone.startsWith('55') ? cleanPhone : '55' + cleanPhone}` : '';
 
+  if (isEditing) {
+    return (
+      <div className="bg-white rounded-2xl shadow-md border border-blue-200 p-5 flex flex-col h-full animate-in fade-in duration-200">
+        <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+          <span className="text-blue-600">✏️</span> Editar Lead
+        </h3>
+        
+        <div className="space-y-3 mb-6 flex-grow">
+          <div>
+            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Nome do Estabelecimento</label>
+            <input 
+              type="text" 
+              className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+              value={editForm.name}
+              onChange={(e) => setEditForm({...editForm, name: e.target.value})}
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Tipo de Negócio</label>
+            <input 
+              type="text" 
+              className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+              value={editForm.businessType}
+              onChange={(e) => setEditForm({...editForm, businessType: e.target.value})}
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Localização</label>
+            <input 
+              type="text" 
+              className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+              value={editForm.location}
+              onChange={(e) => setEditForm({...editForm, location: e.target.value})}
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Telefone / WhatsApp</label>
+            <input 
+              type="text" 
+              className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+              value={editForm.phone}
+              onChange={(e) => setEditForm({...editForm, phone: e.target.value})}
+            />
+          </div>
+        </div>
+
+        <div className="flex gap-2">
+          <button 
+            onClick={() => setIsEditing(false)}
+            className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 font-semibold py-2.5 rounded-xl transition-colors text-sm"
+          >
+            Cancelar
+          </button>
+          <button 
+            onClick={handleSaveEdit}
+            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-xl transition-colors text-sm shadow-md"
+          >
+            Salvar Alterações
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className={`bg-white rounded-2xl shadow-sm border ${showSuccess ? 'border-green-400' : 'border-slate-100'} p-5 hover:shadow-md transition-all group relative flex flex-col h-full`}>
+    <div className={`bg-white rounded-2xl shadow-sm border ${showSuccessNotes ? 'border-green-400' : 'border-slate-100'} p-5 hover:shadow-md transition-all group relative flex flex-col h-full`}>
       <div className="flex justify-between items-start mb-4">
         <div className="flex-1 mr-2">
-          <h3 className="text-lg font-bold text-slate-800 group-hover:text-blue-600 transition-colors truncate">
-            {lead.name}
-          </h3>
+          <div className="flex items-center gap-2">
+            <h3 className="text-lg font-bold text-slate-800 group-hover:text-blue-600 transition-colors truncate">
+              {lead.name}
+            </h3>
+            <button 
+              onClick={() => setIsEditing(true)}
+              className="opacity-0 group-hover:opacity-100 p-1 hover:bg-blue-50 rounded-md text-blue-600 transition-all"
+              title="Editar campos"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+              </svg>
+            </button>
+          </div>
           <p className="text-sm text-slate-500 font-medium uppercase tracking-wider">{lead.businessType}</p>
         </div>
         
@@ -90,7 +180,7 @@ const LeadCard: React.FC<LeadCardProps> = ({ lead, onAction, onStatusChange, onN
       <div className="mb-4 flex-grow relative">
         <div className="flex justify-between items-center mb-1.5">
           <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest">Notas do Lead</label>
-          {showSuccess && (
+          {showSuccessNotes && (
             <span className="text-[10px] font-bold text-green-600 animate-bounce flex items-center gap-1">
               ✓ Notas salvas!
             </span>
@@ -102,23 +192,23 @@ const LeadCard: React.FC<LeadCardProps> = ({ lead, onAction, onStatusChange, onN
             onChange={(e) => setLocalNotes(e.target.value)}
             placeholder="Adicione observações importantes..."
             className={`w-full border rounded-xl p-3 text-sm text-slate-700 focus:outline-none focus:ring-2 transition-all h-24 resize-none ${
-              showSuccess 
+              showSuccessNotes 
                 ? 'bg-green-50 border-green-300 ring-green-100' 
                 : 'bg-slate-50 border-slate-200 focus:ring-blue-500 focus:bg-white'
             }`}
           />
           <button
             onClick={handleSaveNotes}
-            disabled={localNotes === (lead.notes || '') || isSaving}
+            disabled={localNotes === (lead.notes || '') || isSavingNotes}
             className={`absolute bottom-2 right-2 px-3 py-1.5 text-[10px] font-bold rounded-lg transition-all transform active:scale-95 ${
-              isSaving 
+              isSavingNotes 
                 ? 'bg-green-500 text-white cursor-wait' 
                 : localNotes !== (lead.notes || '') 
                   ? 'bg-orange-500 text-white shadow-lg hover:bg-orange-600' 
                   : 'bg-slate-200 text-slate-400 opacity-0 pointer-events-none'
             }`}
           >
-            {isSaving ? (
+            {isSavingNotes ? (
               <span className="flex items-center gap-1">
                 <svg className="animate-spin h-3 w-3 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
