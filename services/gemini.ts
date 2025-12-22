@@ -2,15 +2,17 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Lead, SearchResult } from "../types";
 
-// @ts-ignore
-const API_KEY = (typeof process !== 'undefined' ? process.env.API_KEY : '') || '';
+// Declare process to satisfy TS without @types/node
+declare const process: {
+  env: {
+    API_KEY: string;
+  };
+};
 
 export const searchLeads = async (query: string, location?: string): Promise<SearchResult> => {
-  if (!API_KEY) {
-    console.error("API_KEY não encontrada no ambiente.");
-  }
+  const apiKey = process.env.API_KEY;
   
-  const ai = new GoogleGenAI({ apiKey: API_KEY });
+  const ai = new GoogleGenAI({ apiKey });
   const fullPrompt = `Encontre empresas, estabelecimentos comerciais, condomínios ou instituições do ramo de "${query}" na região de "${location || 'Brasil'}". 
   O objetivo é identificar potenciais compradores de materiais de limpeza em larga escala.
   Tente encontrar o número de telefone de contato (WhatsApp ou fixo) para cada lead.
@@ -18,7 +20,7 @@ export const searchLeads = async (query: string, location?: string): Promise<Sea
   Crie também um "título" curto e chamativo para cada lead (ex: "Condomínio de Alto Padrão", "Hospital Regional", "Academia Premium").`;
 
   const response = await ai.models.generateContent({
-    model: "gemini-3-flash-preview",
+    model: "gemini-3-pro-preview",
     contents: fullPrompt,
     config: {
       tools: [{ googleSearch: {} }],
@@ -57,9 +59,10 @@ export const searchLeads = async (query: string, location?: string): Promise<Sea
     }));
 
   try {
-    const data = JSON.parse(response.text || '{"leads":[]}');
+    const text = response.text || '{"leads":[]}';
+    const data = JSON.parse(text);
     return {
-      leads: data.leads.map((l: any) => ({
+      leads: (data.leads || []).map((l: any) => ({
         ...l,
         id: Math.random().toString(36).substr(2, 9),
         status: 'Novo'
@@ -73,7 +76,8 @@ export const searchLeads = async (query: string, location?: string): Promise<Sea
 };
 
 export const generateOutreach = async (lead: Lead, myBusiness: string): Promise<string> => {
-  const ai = new GoogleGenAI({ apiKey: API_KEY });
+  const apiKey = process.env.API_KEY;
+  const ai = new GoogleGenAI({ apiKey });
   const prompt = `Crie uma mensagem de WhatsApp persuasiva para abordar o lead "${lead.name}".
   Dados do lead: ${lead.description}. Local: ${lead.location}.
   
