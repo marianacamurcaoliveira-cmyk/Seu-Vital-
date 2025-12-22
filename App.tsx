@@ -69,6 +69,13 @@ const App: React.FC = () => {
     );
   };
 
+  const handleDeleteLead = (id: string) => {
+    setLeads(prevLeads => prevLeads.filter(lead => lead.id !== id));
+    if (selectedLead?.id === id) {
+      setSelectedLead(null);
+    }
+  };
+
   const handleGenerateScript = async (lead: Lead) => {
     setSelectedLead(lead);
     setOutreachMsg('Gerando script personalizado com foco em inovação e qualidade...');
@@ -194,6 +201,7 @@ const App: React.FC = () => {
               onStatusChange={handleStatusChange}
               onNotesChange={handleNotesChange}
               onUpdate={handleUpdateLead}
+              onDelete={handleDeleteLead}
             />
           ))}
         </div>

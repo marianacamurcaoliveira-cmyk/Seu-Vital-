@@ -1,6 +1,7 @@
 {
   "name": "Copy of Agente de Vendas Regional - Vendas Seu Vital",
   "description": "Um agente de vendas inteligente projetado para captar e gerenciar leads regionais utilizando IA e busca em tempo real.",
+  "frameworkPreset": "Next.js",
   "requestFramePermissions": [
     "geolocation"
   ]
