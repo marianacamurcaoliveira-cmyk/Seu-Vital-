@@ -2,6 +2,7 @@
 export interface Lead {
   id: string;
   name: string;
+  title?: string;
   businessType: string;
   location: string;
   website?: string;

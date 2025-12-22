@@ -203,13 +203,18 @@ const App: React.FC = () => {
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-2xl w-full shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
             <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-blue-50/50 shrink-0">
-              <div>
-                <h3 className="text-2xl font-bold text-slate-800 truncate max-w-[400px]">{selectedLead.name}</h3>
+              <div className="overflow-hidden">
+                {selectedLead.title && (
+                  <span className="inline-block bg-blue-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-md mb-1 uppercase tracking-widest">
+                    {selectedLead.title}
+                  </span>
+                )}
+                <h3 className="text-2xl font-bold text-slate-800 truncate max-w-full">{selectedLead.name}</h3>
                 <p className="text-blue-600 font-medium">Abordagem de Inovação e Qualidade</p>
               </div>
               <button 
                 onClick={() => setSelectedLead(null)}
-                className="w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center hover:bg-slate-50 transition-colors"
+                className="w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center hover:bg-slate-50 transition-colors shrink-0"
               >
                 ✕
               </button>

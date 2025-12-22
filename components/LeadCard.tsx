@@ -14,6 +14,7 @@ const LeadCard: React.FC<LeadCardProps> = ({ lead, onAction, onStatusChange, onN
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState({
     name: lead.name,
+    title: lead.title || '',
     businessType: lead.businessType,
     location: lead.location,
     phone: lead.phone || ''
@@ -65,7 +66,17 @@ const LeadCard: React.FC<LeadCardProps> = ({ lead, onAction, onStatusChange, onN
           <span className="text-blue-600">✏️</span> Editar Lead
         </h3>
         
-        <div className="space-y-3 mb-6 flex-grow">
+        <div className="space-y-3 mb-6 flex-grow overflow-y-auto pr-1">
+          <div>
+            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Título do Lead (Chamada)</label>
+            <input 
+              type="text" 
+              placeholder="Ex: Cliente VIP, Grande Oportunidade..."
+              className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+              value={editForm.title}
+              onChange={(e) => setEditForm({...editForm, title: e.target.value})}
+            />
+          </div>
           <div>
             <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Nome do Estabelecimento</label>
             <input 
@@ -104,7 +115,7 @@ const LeadCard: React.FC<LeadCardProps> = ({ lead, onAction, onStatusChange, onN
           </div>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex gap-2 shrink-0">
           <button 
             onClick={() => setIsEditing(false)}
             className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 font-semibold py-2.5 rounded-xl transition-colors text-sm"
@@ -115,7 +126,7 @@ const LeadCard: React.FC<LeadCardProps> = ({ lead, onAction, onStatusChange, onN
             onClick={handleSaveEdit}
             className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-xl transition-colors text-sm shadow-md"
           >
-            Salvar Alterações
+            Salvar
           </button>
         </div>
       </div>
@@ -124,8 +135,13 @@ const LeadCard: React.FC<LeadCardProps> = ({ lead, onAction, onStatusChange, onN
 
   return (
     <div className={`bg-white rounded-2xl shadow-sm border ${showSuccessNotes ? 'border-green-400' : 'border-slate-100'} p-5 hover:shadow-md transition-all group relative flex flex-col h-full`}>
-      <div className="flex justify-between items-start mb-4">
-        <div className="flex-1 mr-2">
+      <div className="flex justify-between items-start mb-2">
+        <div className="flex-1 mr-2 overflow-hidden">
+          {lead.title && (
+            <span className="inline-block bg-blue-50 text-blue-600 text-[10px] font-bold px-2 py-0.5 rounded-md mb-1 uppercase tracking-wider">
+              {lead.title}
+            </span>
+          )}
           <div className="flex items-center gap-2">
             <h3 className="text-lg font-bold text-slate-800 group-hover:text-blue-600 transition-colors truncate">
               {lead.name}
@@ -140,7 +156,7 @@ const LeadCard: React.FC<LeadCardProps> = ({ lead, onAction, onStatusChange, onN
               </svg>
             </button>
           </div>
-          <p className="text-sm text-slate-500 font-medium uppercase tracking-wider">{lead.businessType}</p>
+          <p className="text-sm text-slate-500 font-medium uppercase tracking-wider truncate">{lead.businessType}</p>
         </div>
         
         <div className="relative shrink-0">
@@ -167,11 +183,11 @@ const LeadCard: React.FC<LeadCardProps> = ({ lead, onAction, onStatusChange, onN
         {lead.description}
       </p>
 
-      <div className="flex flex-wrap items-center gap-3 text-sm text-slate-500 mb-4">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500 mb-4">
         <span className="flex items-center gap-1">📍 {lead.location}</span>
         <span className="flex items-center gap-1">⭐ {lead.score}% Match</span>
         {lead.phone && (
-          <span className="flex items-center gap-1 bg-slate-100 px-2 py-0.5 rounded-md text-[11px] font-bold text-slate-700">
+          <span className="flex items-center gap-1 bg-slate-100 px-2 py-0.5 rounded-md font-bold text-slate-700">
             📞 {lead.phone}
           </span>
         )}
@@ -214,9 +230,8 @@ const LeadCard: React.FC<LeadCardProps> = ({ lead, onAction, onStatusChange, onN
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
-                Salvando...
               </span>
-            ) : 'Salvar Nota'}
+            ) : 'Salvar'}
           </button>
         </div>
       </div>
