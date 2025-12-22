@@ -1,8 +1,8 @@
 
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 import { Lead, SearchResult } from "../types";
 
-// Declare process to satisfy TS without @types/node
+// Declare process para satisfazer o TS sem @types/node
 declare const process: {
   env: {
     API_KEY: string;
@@ -11,45 +11,45 @@ declare const process: {
 
 export const searchLeads = async (query: string, location?: string): Promise<SearchResult> => {
   const apiKey = process.env.API_KEY;
-  
   const ai = new GoogleGenAI({ apiKey });
-  const fullPrompt = `Encontre empresas, estabelecimentos comerciais, condomínios ou instituições do ramo de "${query}" na região de "${location || 'Brasil'}". 
-  O objetivo é identificar potenciais compradores de materiais de limpeza em larga escala.
-  Tente encontrar o número de telefone de contato (WhatsApp ou fixo) para cada lead.
-  Forneça detalhes como nome, o que fazem, telefone e uma breve justificativa de por que precisam de produtos de limpeza agora.
-  Crie também um "título" curto e chamativo para cada lead (ex: "Condomínio de Alto Padrão", "Hospital Regional", "Academia Premium").`;
+  
+  const fullPrompt = `Você é um especialista em prospecção de vendas B2B. 
+Encontre empresas, estabelecimentos, condomínios ou instituições do ramo de "${query}" na região de "${location || 'Brasil'}".
+O objetivo é identificar potenciais compradores de materiais de limpeza (marcas Talimpo e Superaplast).
+
+Para cada lead encontrado via Google Search, extraia:
+1. Nome oficial
+2. Um título curto (ex: "Condomínio de Luxo", "Hospital Regional")
+3. Tipo de negócio
+4. Localização exata (Bairro/Cidade)
+5. Telefone ou WhatsApp de contato (MUITO IMPORTANTE)
+6. Uma breve descrição de por que eles precisam de produtos de limpeza profissional agora.
+7. Um Score de 1 a 100 de potencial de venda.
+
+Responda OBRIGATORIAMENTE seguindo este formato JSON dentro de um bloco de código:
+{
+  "leads": [
+    {
+      "name": "Nome",
+      "title": "Título",
+      "businessType": "Tipo",
+      "location": "Local",
+      "description": "Por que prospectar...",
+      "phone": "Telefone",
+      "score": 85
+    }
+  ]
+}`;
 
   const response = await ai.models.generateContent({
-    model: "gemini-3-pro-preview",
+    model: "gemini-3-flash-preview",
     contents: fullPrompt,
     config: {
-      tools: [{ googleSearch: {} }],
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          leads: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                name: { type: Type.STRING },
-                title: { type: Type.STRING, description: "Um título curto e chamativo para o lead" },
-                businessType: { type: Type.STRING },
-                location: { type: Type.STRING },
-                description: { type: Type.STRING },
-                website: { type: Type.STRING },
-                phone: { type: Type.STRING, description: "Número de telefone ou WhatsApp do estabelecimento" },
-                score: { type: Type.NUMBER, description: "Score de 1 a 100 de quão bom o lead parece ser para venda de materiais de limpeza" }
-              },
-              required: ["name", "title", "businessType", "location", "description", "score"]
-            }
-          }
-        }
-      }
+      tools: [{ googleSearch: {} }]
     }
   });
 
+  const text = response.text || "";
   const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
   const groundingLinks = groundingChunks
     .filter(chunk => chunk.web)
@@ -59,8 +59,11 @@ export const searchLeads = async (query: string, location?: string): Promise<Sea
     }));
 
   try {
-    const text = response.text || '{"leads":[]}';
-    const data = JSON.parse(text);
+    // Extrai o JSON de dentro do bloco de código markdown se existir
+    const jsonMatch = text.match(/```json\n([\s\S]*?)\n```/) || text.match(/{[\s\S]*}/);
+    const jsonString = jsonMatch ? jsonMatch[0].replace(/```json|```/g, '') : '{"leads":[]}';
+    const data = JSON.parse(jsonString);
+    
     return {
       leads: (data.leads || []).map((l: any) => ({
         ...l,
@@ -70,7 +73,8 @@ export const searchLeads = async (query: string, location?: string): Promise<Sea
       groundingLinks
     };
   } catch (e) {
-    console.error("Erro ao processar JSON do Gemini", e);
+    console.error("Erro ao processar resposta do Gemini:", e);
+    // Fallback: tenta encontrar leads no texto de forma mais simples se o JSON falhar
     return { leads: [], groundingLinks: [] };
   }
 };
@@ -85,17 +89,15 @@ export const generateOutreach = async (lead: Lead, myBusiness: string): Promise<
   
   DIRETRIZES DA MENSAGEM:
   1. Comece de forma amigável e profissional.
-  2. Mencione que queremos trazer INOVAÇÃO e QUALIDADE superior na rotina de limpeza deles.
-  3. Destaque que somos distribuidores completos e temos fábricas próprias das marcas TALIMPO (saneantes) e SUPERAPLAST (sacos de lixo).
-  4. Enfatize que além dessas marcas, oferecemos uma linha completa de produtos para todas as necessidades.
-  5. Seja breve, direto e peça uma oportunidade para apresentar as soluções inovadoras que temos.
-  6. IMPORTANTE: Sempre assine a mensagem EXATAMENTE como: "Vital, material de limpeza".
-  7. Use emojis de forma profissional e moderada.`;
+  2. Mencione inovação e qualidade superior.
+  3. Destaque marcas próprias TALIMPO (químicos) e SUPERAPLAST (sacos de lixo).
+  4. Seja breve e peça uma oportunidade de apresentação.
+  5. Assine sempre como: "Vital, material de limpeza".`;
 
   const response = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
     contents: prompt
   });
 
-  return response.text || "Erro ao gerar mensagem automática.";
+  return response.text || "Olá, gostaria de apresentar nossas soluções em limpeza.";
 };
