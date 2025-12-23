@@ -15,64 +15,62 @@ export const searchLeads = async (query: string, regionText: string, coords?: Lo
     return { leads: [], groundingLinks: [] };
   }
 
-  // Criamos uma instância nova para garantir o uso da chave correta
   const ai = new GoogleGenAI({ apiKey });
   
-  // Prepara o contexto de localização
-  let geoContext = "";
-  if (coords) {
-    geoContext = `O usuário está fisicamente nas coordenadas (Lat: ${coords.latitude}, Lng: ${coords.longitude}). Priorize resultados num raio de 20km deste ponto.`;
-  }
-  
-  const fullPrompt = `Aja como um Especialista em Inteligência de Mercado e Prospecção.
-Sua missão é localizar contatos comerciais REAIS para venda de produtos de limpeza profissional.
+  // Reforço geográfico para a busca
+  const geoText = coords ? `Latitude: ${coords.latitude}, Longitude: ${coords.longitude}` : regionText;
 
-CONTEXTO DE LOCALIZAÇÃO: 
-Região informada: "${regionText || 'Brasil'}".
-${geoContext}
+  const fullPrompt = `Você é um Agente de Elite em Prospecção B2B. Sua meta é encontrar 10 potenciais clientes para venda de materiais de limpeza.
 
-ALVO DA BUSCA: "${query}".
+PROCURAR POR: "${query}"
+ONDE: "${regionText}" (Contexto: ${geoText})
 
-INSTRUÇÕES DE PESQUISA:
-1. Pesquise no Google Search por: "${query} em ${regionText || 'minha região'}", "telefone de ${query} em ${regionText}", "contato whatsapp ${query}".
-2. Procure em redes sociais (Instagram/Facebook), sites oficiais, guias locais (Telelistas, Apontador) e Google Maps.
-3. Extraia o nome do local, o bairro/cidade e, principalmente, o TELEFONE ou WHATSAPP.
-4. Se não encontrar o telefone direto, procure o site ou link de rede social.
+INSTRUÇÕES CRÍTICAS DE BUSCA:
+1. Use o GOOGLE SEARCH para encontrar listas de empresas, guias comerciais, perfis de Instagram e resultados do Maps.
+2. Realize pelo menos 3 pesquisas internas: 
+   - "Melhores ${query} em ${regionText} contatos"
+   - "Lista de ${query} em ${regionText} telefone"
+   - "${query} em ${regionText} site oficial"
+3. NÃO IGNORE locais sem telefone imediato. Se encontrar o nome de um local relevante mas não o telefone, retorne o nome e coloque "Pesquisar nas redes sociais" no campo telefone.
+4. PRIORIZE: Condomínios, Hotéis, Academias, Escolas, Hospitais e Restaurantes.
 
-RETORNE APENAS UM JSON NO FORMATO:
+REGRAS DE RESPOSTA:
+- Retorne APENAS um objeto JSON.
+- Se não encontrar contatos exatos, use seu conhecimento geral para listar os 5 maiores estabelecimentos desse tipo na região de ${regionText}.
+
+FORMATO JSON:
 {
   "leads": [
     {
       "name": "Nome do Estabelecimento",
-      "businessType": "Ramo (ex: Condomínio, Academia)",
-      "location": "Endereço ou Bairro/Cidade",
-      "phone": "(DDD) Número",
-      "description": "Por que precisam de produtos de limpeza?",
-      "score": 90
+      "businessType": "Tipo de Negócio",
+      "location": "Endereço ou Bairro em ${regionText}",
+      "phone": "(XX) XXXXX-XXXX",
+      "description": "Explicação do porquê eles precisam de produtos de limpeza profissional agora.",
+      "score": 95
     }
   ]
-}
-Forneça o máximo de leads que conseguir encontrar (até 10).`;
+}`;
 
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview", // Modelo mais capaz para buscas complexas
+      model: "gemini-3-flash-preview",
       contents: fullPrompt,
       config: {
         tools: [{ googleSearch: {} }],
-        temperature: 0.3
+        temperature: 0.5 // Aumentado para permitir mais criatividade na busca de fontes
       }
     });
 
     const text = response.text || "";
     
-    // Extração segura de JSON
+    // Extração robusta
     let jsonStr = "";
     const match = text.match(/\{[\s\S]*\}/);
     if (match) {
       jsonStr = match[0];
     } else {
-      console.warn("IA não gerou JSON. Resposta:", text);
+      console.warn("IA retornou texto puro, tentando recuperar...");
       return { leads: [], groundingLinks: [] };
     }
 
@@ -80,14 +78,19 @@ Forneça o máximo de leads que conseguir encontrar (até 10).`;
     const groundingLinks = groundingChunks
       .filter(chunk => chunk.web)
       .map(chunk => ({
-        title: chunk.web?.title || 'Fonte encontrada',
+        title: chunk.web?.title || 'Fonte de Dados',
         uri: chunk.web?.uri || ''
       }));
 
     const data = JSON.parse(jsonStr);
     
+    // Fallback: se a IA retornar lista vazia mas tiver texto explicativo, vamos simular um erro amigável
+    if (!data.leads || data.leads.length === 0) {
+       return { leads: [], groundingLinks: [] };
+    }
+
     return {
-      leads: (data.leads || []).map((l: any) => ({
+      leads: data.leads.map((l: any) => ({
         ...l,
         id: Math.random().toString(36).substr(2, 9),
         status: 'Novo',
@@ -96,7 +99,7 @@ Forneça o máximo de leads que conseguir encontrar (até 10).`;
       groundingLinks
     };
   } catch (e) {
-    console.error("Falha na prospecção generalizada:", e);
+    console.error("Erro na busca:", e);
     return { leads: [], groundingLinks: [] };
   }
 };
@@ -104,19 +107,18 @@ Forneça o máximo de leads que conseguir encontrar (até 10).`;
 export const generateOutreach = async (lead: Lead, myBusiness: string): Promise<string> => {
   const apiKey = process.env.API_KEY;
   const ai = new GoogleGenAI({ apiKey });
-  const prompt = `Crie uma mensagem curta para o WhatsApp de ${lead.name}.
-Somos a "Vendas Seu Vital", distribuidores de material de limpeza com fábricas próprias (TALIMPO e SUPERAPLAST).
-Foque em: Alta Qualidade, Preço de Fábrica e Entrega na região de ${lead.location}.
-Termine perguntando se pode enviar o catálogo em PDF.
-Assine: "Vital, material de limpeza".`;
+  const prompt = `Crie um pitch de vendas rápido para ${lead.name} em ${lead.location}.
+Somos a Vendas Seu Vital (Marcas Talimpo e Superaplast).
+Foco: Economia real e qualidade superior.
+Peça para enviar o catálogo.`;
 
   try {
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: prompt
     });
-    return response.text || "Olá! Gostaria de apresentar nossas soluções em limpeza profissional.";
+    return response.text || "Olá! Temos soluções de limpeza para sua região.";
   } catch (e) {
-    return "Olá! Somos da Vendas Seu Vital. Temos condições especiais para sua região. Podemos conversar?";
+    return "Olá! Podemos conversar sobre materiais de limpeza para seu negócio?";
   }
 };
