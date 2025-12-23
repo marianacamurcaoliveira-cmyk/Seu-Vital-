@@ -19,28 +19,24 @@ export const searchLeads = async (query: string, city: string, country: string):
   
   const locationContext = `${city}, ${country}`;
 
-  const fullPrompt = `Você é o Especialista Chefe de Prospecção da "Vendas Seu Vital".
-Sua tarefa é encontrar 10 potenciais clientes (Empresas/Estabelecimentos) para venda de produtos de limpeza profissional.
+  const fullPrompt = `Você é o Agente de Elite da "Vendas Seu Vital". Sua missão é mapear o mercado de "${query}" na cidade de "${city}", "${country}".
 
-OBJETIVO: Encontrar "${query}"
-LOCALIZAÇÃO: "${locationContext}"
+INSTRUÇÕES CRÍTICAS:
+1. FOCO TOTAL NA CIDADE: Ignore qualquer outra localização. Sua pesquisa DEVE ser em "${city}".
+2. BUSCA WEB: Use a ferramenta Google Search para encontrar empresas reais, seus endereços, telefones e nomes.
+3. CONHECIMENTO DE APOIO: Se a busca web estiver limitada para essa cidade específica, use seu conhecimento geral para listar os maiores e mais conhecidos estabelecimentos desse ramo (ex: condomínios famosos, maiores hospitais, hotéis centrais) em "${city}".
+4. DADOS DE CONTATO: Se não achar o WhatsApp, informe o endereço físico no campo location e coloque "Visita Presencial" no campo telefone. JAMAIS retorne uma lista vazia.
+5. PÚBLICO: O cliente vende materiais de limpeza profissional (Talimpo/Superaplast). Foque em lugares que consomem muito papel, químicos e sacos de lixo.
 
-INSTRUÇÕES DE PESQUISA (MUITO IMPORTANTE):
-1. Use a busca do Google para encontrar resultados no Google Maps, Instagram, Facebook e sites oficiais em ${city}.
-2. Procure por termos como: "Contatos de ${query} em ${city}", "Telefones de ${query} em ${city}", "Melhores ${query} em ${city}".
-3. Se a busca em tempo real não retornar resultados específicos com telefone, use seu CONHECIMENTO DE MERCADO para listar os 5-10 estabelecimentos mais famosos desse ramo em ${city}.
-4. No campo telefone, se não encontrar o número exato, escreva "Consultar Instagram" ou "Localizado em ${city}".
-5. JAMAIS retorne uma lista vazia. Se a cidade for pequena, procure nos arredores ou liste as maiores empresas do setor na região.
-
-FORMATO DE RESPOSTA (JSON APENAS):
+RESPONDA APENAS EM JSON:
 {
   "leads": [
     {
       "name": "Nome da Empresa",
-      "businessType": "Ramo de Atividade",
-      "location": "Endereço ou Bairro em ${city}",
-      "phone": "(DDD) XXXX-XXXX",
-      "description": "Por que eles precisam de material de limpeza profissional?",
+      "businessType": "Tipo de Negócio",
+      "location": "Bairro ou Endereço em ${city}",
+      "phone": "(XX) XXXX-XXXX",
+      "description": "Por que eles precisam de material de limpeza?",
       "score": 95
     }
   ]
@@ -52,7 +48,7 @@ FORMATO DE RESPOSTA (JSON APENAS):
       contents: fullPrompt,
       config: {
         tools: [{ googleSearch: {} }],
-        temperature: 0.8
+        temperature: 0.6
       }
     });
 
@@ -70,7 +66,7 @@ FORMATO DE RESPOSTA (JSON APENAS):
     const groundingLinks = groundingChunks
       .filter(chunk => chunk.web)
       .map(chunk => ({
-        title: chunk.web?.title || 'Fonte Local',
+        title: chunk.web?.title || 'Fonte de Informação',
         uri: chunk.web?.uri || ''
       }));
 
@@ -92,18 +88,19 @@ FORMATO DE RESPOSTA (JSON APENAS):
 export const generateOutreach = async (lead: Lead, myBusiness: string): Promise<string> => {
   const apiKey = process.env.API_KEY;
   const ai = new GoogleGenAI({ apiKey });
-  const prompt = `Crie uma mensagem profissional de WhatsApp para ${lead.name} em ${lead.location}.
-Somos a Vendas Seu Vital. Fábrica de químicos (Talimpo) e sacos de lixo (Superaplast).
-Foque em: Alta performance, Preço direto de fábrica e Atendimento em ${lead.location}.
-Peça uma oportunidade para enviar o catálogo digital.`;
+  const prompt = `Crie uma mensagem profissional e amigável para enviar via WhatsApp para ${lead.name} em ${lead.location}.
+Somos a Vendas Seu Vital (Marcas Talimpo e Superaplast).
+Vendemos direto da fábrica químicos de limpeza e sacos de lixo.
+Destaque: Preço imbatível e qualidade superior.
+Peça para enviar o catálogo digital.`;
 
   try {
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: prompt
     });
-    return response.text || "Olá! Gostaria de apresentar nossas soluções em limpeza direta da fábrica.";
+    return response.text || "Olá! Gostaria de apresentar nossos produtos de limpeza para seu negócio.";
   } catch (e) {
-    return "Olá! Somos da Vendas Seu Vital e temos condições especiais para sua região. Podemos conversar?";
+    return "Olá! Somos da Vendas Seu Vital e temos condições especiais para sua região.";
   }
 };
