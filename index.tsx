@@ -1,10 +1,10 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import Sidebar from './components/Sidebar';
 import LeadCard from './components/LeadCard';
 import { searchLeads, generateOutreach } from './services/gemini';
-import { Lead, LocationData } from './types';
+import { Lead } from './types';
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -12,45 +12,26 @@ function App() {
   const [groundingLinks, setGroundingLinks] = useState<{title: string, uri: string}[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [region, setRegion] = useState('');
+  const [city, setCity] = useState('');
+  const [country, setCountry] = useState('Brasil');
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [outreachMsg, setOutreachMsg] = useState('');
-  const [location, setLocation] = useState<LocationData | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
   
   const businessProfile = "Vendas Seu Vital - Distribuidora com fábricas próprias (Talimpo e Superaplast).";
 
-  useEffect(() => {
-    if (typeof window !== 'undefined' && navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => setLocation({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
-        () => console.log("GPS não disponível, usando busca manual."),
-        { enableHighAccuracy: true, timeout: 5000 }
-      );
-    }
-  }, []);
-
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Priorizamos o que o usuário escreveu. O GPS é apenas um fallback.
-    const searchRegion = region.trim();
-    
-    if (!searchQuery.trim()) {
-      alert("O que você quer vender hoje? Digite um termo (ex: Restaurantes).");
-      return;
-    }
-
-    if (!searchRegion && !location) {
-      alert("Por favor, digite o nome da sua Cidade ou Região.");
+    if (!searchQuery.trim() || !city.trim() || !country.trim()) {
+      alert("Por favor, preencha o que procura, a cidade e o país.");
       return;
     }
     
     setLoading(true);
     setHasSearched(true);
     try {
-      // Passamos o texto da região prioritariamente
-      const results = await searchLeads(searchQuery, searchRegion, searchRegion ? null : location);
+      const results = await searchLeads(searchQuery, city, country);
       setLeads(results.leads || []);
       setGroundingLinks(results.groundingLinks || []);
       if (results.leads && results.leads.length > 0) {
@@ -58,6 +39,7 @@ function App() {
       }
     } catch (err) {
       console.error(err);
+      alert("Ocorreu um erro na busca. Verifique sua conexão e tente novamente.");
     } finally {
       setLoading(false);
     }
@@ -73,7 +55,7 @@ function App() {
 
   const handleGenerateScript = async (lead: Lead) => {
     setSelectedLead(lead);
-    setOutreachMsg('Gerando proposta personalizada para este local...');
+    setOutreachMsg('Analisando perfil do cliente e gerando proposta...');
     const msg = await generateOutreach(lead, businessProfile);
     setOutreachMsg(msg);
   };
@@ -86,69 +68,89 @@ function App() {
         <div className="max-w-6xl mx-auto">
           {activeTab === 'dashboard' && (
             <div className="space-y-8 animate-in fade-in duration-500">
-              <header className="flex justify-between items-end">
-                <div>
-                  <h2 className="text-3xl font-bold text-slate-800">Vendas Seu Vital 🚀</h2>
-                  <p className="text-slate-500">Prospecção Inteligente em {region || 'Sua Região'}.</p>
-                </div>
+              <header>
+                <h2 className="text-3xl font-bold text-slate-800 tracking-tight">Vendas Seu Vital 🚀</h2>
+                <p className="text-slate-500 font-medium">Encontre clientes ideais em qualquer lugar do mundo.</p>
               </header>
 
               <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm">
-                <h3 className="text-lg font-bold mb-6 text-slate-700">🔎 Nova Busca Regional</h3>
-                <form onSubmit={handleSearch} className="flex flex-col md:flex-row gap-4">
-                  <div className="flex-1">
-                    <label className="block text-xs font-bold text-slate-400 uppercase mb-2">O que você quer vender?</label>
-                    <input 
-                      type="text" placeholder="Ex: Condomínios, Academias, Hotéis..." 
-                      className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-4 px-6 focus:ring-2 focus:ring-blue-500 outline-none"
-                      value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-                    />
+                <h3 className="text-lg font-bold mb-6 text-slate-700 flex items-center gap-2">
+                  <span className="text-xl">📍</span> Configurar Prospecção Regional
+                </h3>
+                <form onSubmit={handleSearch} className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="md:col-span-1">
+                      <label className="block text-xs font-black text-slate-400 uppercase mb-2 tracking-widest">Alvo da Venda</label>
+                      <input 
+                        type="text" placeholder="Ex: Academias, Condomínios..." 
+                        className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-4 px-6 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                        value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-black text-slate-400 uppercase mb-2 tracking-widest">Cidade / Região</label>
+                      <input 
+                        type="text" placeholder="Ex: Rio de Janeiro" 
+                        className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-4 px-6 focus:ring-2 focus:ring-blue-500 outline-none transition-all font-bold text-blue-600"
+                        value={city} onChange={e => setCity(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-black text-slate-400 uppercase mb-2 tracking-widest">País</label>
+                      <input 
+                        type="text" placeholder="Ex: Brasil" 
+                        className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-4 px-6 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                        value={country} onChange={e => setCountry(e.target.value)}
+                      />
+                    </div>
                   </div>
-                  <div className="md:w-72">
-                    <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Onde? (Cidade ou Bairro)</label>
-                    <input 
-                      type="text" placeholder="Digite sua cidade" 
-                      className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-4 px-6 focus:ring-2 focus:ring-blue-500 outline-none font-bold text-blue-600"
-                      value={region} onChange={e => setRegion(e.target.value)}
-                    />
-                  </div>
-                  <div className="flex items-end">
+                  
+                  <div className="flex justify-end pt-2">
                     <button 
                       disabled={loading}
-                      className="bg-orange-500 hover:bg-orange-600 text-white font-bold h-[62px] px-10 rounded-2xl shadow-lg disabled:opacity-50 transition-all flex items-center gap-2"
+                      className="bg-orange-500 hover:bg-orange-600 text-white font-bold h-16 px-12 rounded-2xl shadow-xl shadow-orange-200 disabled:bg-slate-300 transition-all flex items-center gap-3 text-lg"
                     >
                       {loading ? (
-                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                      ) : '🔍 Prospectar'}
+                        <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                      ) : '🚀 Iniciar Varredura'}
                     </button>
                   </div>
                 </form>
               </div>
 
               {hasSearched && leads.length === 0 && !loading && (
-                <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center shadow-sm">
-                  <div className="text-5xl mb-4">🏠</div>
-                  <h3 className="text-xl font-bold text-slate-800">Ainda buscando os melhores contatos...</h3>
-                  <p className="text-slate-500 mt-2 max-w-lg mx-auto">
-                    Tente usar termos mais simples como <strong>"Escolas"</strong> ou <strong>"Hospitais"</strong>. 
-                    Certifique-se que o nome da cidade <strong>"{region}"</strong> está escrito corretamente.
+                <div className="bg-white border border-slate-200 rounded-3xl p-12 text-center shadow-sm max-w-2xl mx-auto">
+                  <div className="text-6xl mb-6">🔍</div>
+                  <h3 className="text-2xl font-bold text-slate-800">Processando informações de {city}...</h3>
+                  <p className="text-slate-500 mt-3 leading-relaxed">
+                    Estamos analisando diretórios locais e redes sociais. Se a busca demorar, tente simplificar o "Alvo da Venda" para algo mais amplo como <strong>"Restaurantes"</strong> ou <strong>"Lojas"</strong>.
                   </p>
+                  <button 
+                    onClick={() => {setSearchQuery(''); setCity('')}}
+                    className="mt-8 text-blue-600 font-bold hover:underline"
+                  >
+                    Tentar outro termo
+                  </button>
                 </div>
               )}
             </div>
           )}
 
           {activeTab === 'crm' && (
-            <div className="space-y-6">
-              <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold text-slate-800">Oportunidades Encontradas</h2>
+            <div className="space-y-8 animate-in slide-in-from-bottom-6 duration-500">
+              <div className="flex justify-between items-center bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+                <div>
+                  <h2 className="text-2xl font-bold text-slate-800">Mapa de Oportunidades</h2>
+                  <p className="text-slate-500">Resultados para: <strong>{searchQuery}</strong> em <strong>{city}</strong></p>
+                </div>
                 <button 
                   onClick={() => setActiveTab('dashboard')}
-                  className="text-blue-600 font-bold hover:underline"
+                  className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 px-6 rounded-xl transition-all"
                 >
-                  + Nova Busca
+                  Nova Prospecção
                 </button>
               </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {leads.map(lead => (
                   <LeadCard 
@@ -168,19 +170,24 @@ function App() {
 
       {selectedLead && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-2xl w-full p-8 shadow-2xl animate-in zoom-in duration-200">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-2xl font-bold text-slate-800">{selectedLead.name}</h3>
-              <button onClick={() => setSelectedLead(null)} className="text-slate-400 hover:text-slate-600">✕</button>
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-8 shadow-2xl animate-in zoom-in duration-300">
+            <div className="flex justify-between items-start mb-6">
+              <div>
+                <h3 className="text-2xl font-black text-slate-800">{selectedLead.name}</h3>
+                <p className="text-blue-600 font-bold mt-1">📍 {selectedLead.location}</p>
+              </div>
+              <button onClick={() => setSelectedLead(null)} className="w-10 h-10 flex items-center justify-center rounded-full bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors">✕</button>
             </div>
-            <p className="text-blue-600 font-medium mb-6">📍 {selectedLead.location}</p>
-            <div className="bg-slate-50 p-6 rounded-2xl mb-6 border border-slate-200">
-              <p className="text-slate-700 italic leading-relaxed">"{outreachMsg}"</p>
+            
+            <div className="bg-slate-50 p-6 rounded-2xl mb-8 border border-slate-200">
+              <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3">Pitch de Abordagem WhatsApp</h4>
+              <p className="text-slate-700 italic leading-relaxed text-lg">"{outreachMsg}"</p>
             </div>
-            <div className="flex gap-4">
+
+            <div className="grid grid-cols-2 gap-4">
               <button 
-                onClick={() => {navigator.clipboard.writeText(outreachMsg); alert("Texto copiado para o teclado!")}} 
-                className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-800 py-4 rounded-xl font-bold transition-all"
+                onClick={() => {navigator.clipboard.writeText(outreachMsg); alert("Mensagem copiada!")}} 
+                className="bg-slate-100 hover:bg-slate-200 text-slate-800 py-5 rounded-2xl font-black transition-all"
               >
                 Copiar Texto
               </button>
@@ -188,7 +195,7 @@ function App() {
                 href={`https://wa.me/${selectedLead.phone?.replace(/\D/g, '')}?text=${encodeURIComponent(outreachMsg)}`} 
                 target="_blank" 
                 rel="noopener noreferrer"
-                className="flex-1 bg-green-500 hover:bg-green-600 text-white py-4 rounded-xl font-bold text-center flex items-center justify-center gap-2 transition-all shadow-lg shadow-green-200"
+                className="bg-green-500 hover:bg-green-600 text-white py-5 rounded-2xl font-black text-center flex items-center justify-center gap-3 transition-all shadow-xl shadow-green-200"
               >
                 Abrir WhatsApp
               </a>
@@ -198,12 +205,17 @@ function App() {
       )}
 
       {loading && (
-        <div className="fixed inset-0 bg-white/90 backdrop-blur-md z-[100] flex flex-col items-center justify-center text-center px-6">
-          <div className="w-20 h-20 border-4 border-orange-200 border-t-orange-500 rounded-full animate-spin mb-6"></div>
-          <h2 className="text-2xl font-bold text-slate-800 uppercase tracking-tighter">Escaneando {region || 'Região'}</h2>
-          <p className="text-slate-500 mt-2">Estamos buscando em diretórios, redes sociais e sites locais.</p>
-          <div className="mt-8 px-4 py-2 bg-blue-50 text-blue-600 rounded-full text-xs font-black animate-pulse">
-            INTELIGÊNCIA ARTIFICIAL EM OPERAÇÃO
+        <div className="fixed inset-0 bg-white/95 backdrop-blur-xl z-[100] flex flex-col items-center justify-center text-center px-8">
+          <div className="relative mb-10">
+            <div className="w-24 h-24 border-8 border-orange-100 border-t-orange-500 rounded-full animate-spin"></div>
+            <div className="absolute inset-0 flex items-center justify-center text-3xl">📡</div>
+          </div>
+          <h2 className="text-3xl font-black text-slate-800 uppercase tracking-tighter">Mapeando {city}</h2>
+          <p className="text-slate-500 mt-3 text-lg max-w-md">
+            Estamos utilizando inteligência artificial para localizar as melhores oportunidades comerciais de {searchQuery} na sua região.
+          </p>
+          <div className="mt-12 flex gap-2">
+            {[1,2,3].map(i => <div key={i} className="w-3 h-3 bg-orange-500 rounded-full animate-bounce" style={{animationDelay: `${i*0.2}s`}}></div>)}
           </div>
         </div>
       )}

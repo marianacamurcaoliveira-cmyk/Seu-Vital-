@@ -2,7 +2,5 @@
   "name": "Vendas Seu Vital - Agente Regional",
   "description": "Um agente de vendas inteligente projetado para captar e gerenciar leads regionais utilizando IA e busca em tempo real.",
   "frameworkPreset": "Vite",
-  "requestFramePermissions": [
-    "geolocation"
-  ]
+  "requestFramePermissions": []
 }

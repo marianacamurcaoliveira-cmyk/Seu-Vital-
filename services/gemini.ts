@@ -1,6 +1,6 @@
 
 import { GoogleGenAI } from "@google/genai";
-import { Lead, SearchResult, LocationData } from "../types";
+import { Lead, SearchResult } from "../types";
 
 declare const process: {
   env: {
@@ -8,7 +8,7 @@ declare const process: {
   };
 };
 
-export const searchLeads = async (query: string, regionText: string, coords?: LocationData | null): Promise<SearchResult> => {
+export const searchLeads = async (query: string, city: string, country: string): Promise<SearchResult> => {
   const apiKey = process.env.API_KEY;
   if (!apiKey) {
     console.error("API_KEY não encontrada!");
@@ -17,30 +17,31 @@ export const searchLeads = async (query: string, regionText: string, coords?: Lo
 
   const ai = new GoogleGenAI({ apiKey });
   
-  // Se o usuário escreveu uma região, ignoramos as coordenadas para não confundir a IA
-  const finalRegion = regionText || (coords ? `coordenadas ${coords.latitude}, ${coords.longitude}` : "Brasil");
+  const locationContext = `${city}, ${country}`;
 
-  const fullPrompt = `Você é o Diretor de Inteligência da "Vendas Seu Vital". Sua missão é encontrar CLIENTES REAIS para produtos de limpeza profissional.
+  const fullPrompt = `Você é o Especialista Chefe de Prospecção da "Vendas Seu Vital".
+Sua tarefa é encontrar 10 potenciais clientes (Empresas/Estabelecimentos) para venda de produtos de limpeza profissional.
 
-SOLICITAÇÃO: "${query}"
-LOCALIZAÇÃO: "${finalRegion}"
+OBJETIVO: Encontrar "${query}"
+LOCALIZAÇÃO: "${locationContext}"
 
-INSTRUÇÕES DE BUSCA AMPLA:
-1. PESQUISA WEB: Use a ferramenta de busca para encontrar: "Lista de ${query} em ${finalRegion}", "Telefones de ${query} em ${finalRegion}", "Instagram de ${query} em ${finalRegion}".
-2. CONHECIMENTO INTERNO: Se a pesquisa web não trouxer resultados imediatos, use seu conhecimento sobre a geografia de "${finalRegion}" para listar os 5-10 estabelecimentos mais conhecidos desse ramo na área.
-3. FLEXIBILIDADE DE CONTATO: Se não achar o WhatsApp, coloque no campo telefone: "Buscar no Instagram" ou "Visitar no local (Endereço)". NÃO RETORNE LISTA VAZIA.
-4. FOCO B2B: Procure por Condomínios, Academias, Restaurantes, Clínicas, Escolas e Hotéis.
+INSTRUÇÕES DE PESQUISA (MUITO IMPORTANTE):
+1. Use a busca do Google para encontrar resultados no Google Maps, Instagram, Facebook e sites oficiais em ${city}.
+2. Procure por termos como: "Contatos de ${query} em ${city}", "Telefones de ${query} em ${city}", "Melhores ${query} em ${city}".
+3. Se a busca em tempo real não retornar resultados específicos com telefone, use seu CONHECIMENTO DE MERCADO para listar os 5-10 estabelecimentos mais famosos desse ramo em ${city}.
+4. No campo telefone, se não encontrar o número exato, escreva "Consultar Instagram" ou "Localizado em ${city}".
+5. JAMAIS retorne uma lista vazia. Se a cidade for pequena, procure nos arredores ou liste as maiores empresas do setor na região.
 
 FORMATO DE RESPOSTA (JSON APENAS):
 {
   "leads": [
     {
-      "name": "Nome do Local",
+      "name": "Nome da Empresa",
       "businessType": "Ramo de Atividade",
-      "location": "Bairro/Rua em ${finalRegion}",
+      "location": "Endereço ou Bairro em ${city}",
       "phone": "(DDD) XXXX-XXXX",
-      "description": "Por que eles são um bom alvo para produtos Talimpo/Superaplast?",
-      "score": 90
+      "description": "Por que eles precisam de material de limpeza profissional?",
+      "score": 95
     }
   ]
 }`;
@@ -51,7 +52,7 @@ FORMATO DE RESPOSTA (JSON APENAS):
       contents: fullPrompt,
       config: {
         tools: [{ googleSearch: {} }],
-        temperature: 0.7 // Aumentado para permitir que a IA use conhecimento prévio se a busca falhar
+        temperature: 0.8
       }
     });
 
@@ -69,16 +70,12 @@ FORMATO DE RESPOSTA (JSON APENAS):
     const groundingLinks = groundingChunks
       .filter(chunk => chunk.web)
       .map(chunk => ({
-        title: chunk.web?.title || 'Referência Local',
+        title: chunk.web?.title || 'Fonte Local',
         uri: chunk.web?.uri || ''
       }));
 
-    if (!data.leads || data.leads.length === 0) {
-      return { leads: [], groundingLinks: [] };
-    }
-
     return {
-      leads: data.leads.map((l: any) => ({
+      leads: (data.leads || []).map((l: any) => ({
         ...l,
         id: Math.random().toString(36).substr(2, 9),
         status: 'Novo',
@@ -95,18 +92,18 @@ FORMATO DE RESPOSTA (JSON APENAS):
 export const generateOutreach = async (lead: Lead, myBusiness: string): Promise<string> => {
   const apiKey = process.env.API_KEY;
   const ai = new GoogleGenAI({ apiKey });
-  const prompt = `Crie uma saudação de WhatsApp para ${lead.name}.
-Diga que somos da Vendas Seu Vital e atendemos a região de ${lead.location}.
-Fale sobre a economia de comprar direto da fábrica (Talimpo e Superaplast).
-Seja cordial e direto.`;
+  const prompt = `Crie uma mensagem profissional de WhatsApp para ${lead.name} em ${lead.location}.
+Somos a Vendas Seu Vital. Fábrica de químicos (Talimpo) e sacos de lixo (Superaplast).
+Foque em: Alta performance, Preço direto de fábrica e Atendimento em ${lead.location}.
+Peça uma oportunidade para enviar o catálogo digital.`;
 
   try {
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: prompt
     });
-    return response.text || "Olá! Gostaria de apresentar nossos produtos de limpeza para seu negócio.";
+    return response.text || "Olá! Gostaria de apresentar nossas soluções em limpeza direta da fábrica.";
   } catch (e) {
-    return "Olá! Podemos conversar sobre materiais de limpeza para sua região?";
+    return "Olá! Somos da Vendas Seu Vital e temos condições especiais para sua região. Podemos conversar?";
   }
 };
