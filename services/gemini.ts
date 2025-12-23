@@ -1,6 +1,6 @@
 
 import { GoogleGenAI } from "@google/genai";
-import { Lead, SearchResult } from "../types";
+import { Lead, SearchResult, LocationData } from "../types";
 
 // Declare process para satisfazer o TS sem @types/node
 declare const process: {
@@ -9,7 +9,7 @@ declare const process: {
   };
 };
 
-export const searchLeads = async (query: string, location?: string): Promise<SearchResult> => {
+export const searchLeads = async (query: string, regionText: string, coords?: LocationData | null): Promise<SearchResult> => {
   const apiKey = process.env.API_KEY;
   if (!apiKey) {
     console.error("API_KEY não encontrada!");
@@ -18,63 +18,77 @@ export const searchLeads = async (query: string, location?: string): Promise<Sea
 
   const ai = new GoogleGenAI({ apiKey });
   
-  const fullPrompt = `Aja como um Agente de Prospecção de Vendas. 
-Sua tarefa é encontrar clientes REAIS (estabelecimentos comerciais, condomínios, escolas, etc) que precisem de materiais de limpeza na região de "${location || 'Brasil'}".
-Busque especificamente por: "${query}".
+  // Refinamos o prompt para usar o contexto geográfico
+  const locationContext = coords 
+    ? `Estamos nas coordenadas Lat: ${coords.latitude}, Lng: ${coords.longitude}. Procure estabelecimentos num raio de 20km daqui.`
+    : `Região de busca: ${regionText}`;
 
-Para cada lead encontrado, extraia:
-1. Nome do estabelecimento
-2. Título (Ex: Condomínio Premium, Hospital Público)
-3. Ramo de atividade
-4. Localização (Bairro, Cidade)
-5. Telefone ou WhatsApp de contato (ESSENCIAL)
-6. Descrição curta de por que eles são um bom lead para produtos de limpeza profissional (marcas Talimpo e Superaplast).
-7. Score de 0 a 100 de potencial de venda.
+  const fullPrompt = `Aja como um Agente de Prospecção Regional de Vendas.
+${locationContext}
 
-Responda OBRIGATORIAMENTE em formato JSON puro dentro de um bloco de código:
+Sua tarefa é encontrar estabelecimentos REAIS (condomínios, hotéis, hospitais, indústrias, comércios) que são potenciais compradores de materiais de limpeza profissional.
+Busca específica: "${query}".
+
+Para cada lead encontrado no Google Maps ou Search, extraia:
+1. Nome oficial
+2. Ramo de atividade
+3. Endereço completo (Bairro e Cidade são essenciais)
+4. Telefone ou WhatsApp (com DDD regional)
+5. Uma breve explicação de por que eles precisam de produtos profissionais agora.
+6. Score de 0 a 100 de potencial.
+
+Responda OBRIGATORIAMENTE com um bloco de código JSON como este:
 {
   "leads": [
     {
-      "name": "Nome",
-      "title": "Título",
-      "businessType": "Ramo",
-      "location": "Localização",
-      "phone": "Telefone",
-      "description": "Explicação",
-      "score": 90
+      "name": "Nome do Local",
+      "businessType": "Tipo",
+      "location": "Endereço, Bairro, Cidade",
+      "phone": "(XX) XXXXX-XXXX",
+      "description": "Motivo da prospecção...",
+      "score": 95
     }
   ]
 }`;
 
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview", // Modelo rápido e eficiente para buscas
+      model: "gemini-2.5-flash", // Modelo que suporta Google Maps Grounding
       contents: fullPrompt,
       config: {
-        tools: [{ googleSearch: {} }],
-        temperature: 0.1
+        tools: [{ googleMaps: {} }, { googleSearch: {} }],
+        toolConfig: coords ? {
+          retrievalConfig: {
+            latLng: {
+              latitude: coords.latitude,
+              longitude: coords.longitude
+            }
+          }
+        } : undefined,
+        temperature: 0.2
       }
     });
 
     const text = response.text || "";
     
-    // Extração segura de JSON
+    // Extração robusta de JSON
     let jsonStr = "";
     const match = text.match(/\{[\s\S]*\}/);
     if (match) {
       jsonStr = match[0];
     } else {
-      console.warn("IA não retornou JSON válido:", text);
+      console.warn("IA não retornou JSON estruturado, tentando recuperar dados do texto...");
       return { leads: [], groundingLinks: [] };
     }
 
     const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
     const groundingLinks = groundingChunks
-      .filter(chunk => chunk.web)
-      .map(chunk => ({
-        title: chunk.web?.title || 'Fonte de pesquisa',
-        uri: chunk.web?.uri || ''
-      }));
+      .map(chunk => {
+        if (chunk.maps) return { title: chunk.maps.title || 'Local no Maps', uri: chunk.maps.uri || '' };
+        if (chunk.web) return { title: chunk.web.title || 'Fonte Web', uri: chunk.web.uri || '' };
+        return null;
+      })
+      .filter((link): link is {title: string, uri: string} => link !== null);
 
     const data = JSON.parse(jsonStr);
     
@@ -82,12 +96,13 @@ Responda OBRIGATORIAMENTE em formato JSON puro dentro de um bloco de código:
       leads: (data.leads || []).map((l: any) => ({
         ...l,
         id: Math.random().toString(36).substr(2, 9),
-        status: 'Novo'
+        status: 'Novo',
+        title: l.businessType
       })),
       groundingLinks
     };
   } catch (e) {
-    console.error("Falha na busca Gemini:", e);
+    console.error("Erro na busca regional:", e);
     return { leads: [], groundingLinks: [] };
   }
 };
@@ -95,22 +110,19 @@ Responda OBRIGATORIAMENTE em formato JSON puro dentro de um bloco de código:
 export const generateOutreach = async (lead: Lead, myBusiness: string): Promise<string> => {
   const apiKey = process.env.API_KEY;
   const ai = new GoogleGenAI({ apiKey });
-  const prompt = `Crie uma mensagem curta de WhatsApp para abordar o lead "${lead.name}" (Local: ${lead.location}).
-Falamos em nome da "Vendas Seu Vital", distribuidores de materiais de limpeza com fábricas próprias:
-- TALIMPO (Químicos/Saneantes)
-- SUPERAPLAST (Sacos de lixo)
-
-Destaque inovação, qualidade e preço de fábrica. 
-Finalize perguntando se pode enviar o catálogo em PDF.
-Assine como: "Vital, material de limpeza".`;
+  const prompt = `Crie uma mensagem curta de WhatsApp para o lead "${lead.name}" em ${lead.location}.
+Somos da "Vendas Seu Vital", especialistas em limpeza com fábricas próprias (TALIMPO e SUPERAPLAST).
+Oferecemos economia, inovação e entrega rápida na nossa região.
+Seja educado e peça para enviar o catálogo digital.
+Assine: "Vital, material de limpeza".`;
 
   try {
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: prompt
     });
-    return response.text || "Olá! Gostaria de apresentar soluções de limpeza de alta performance para vocês.";
+    return response.text || "Olá! Gostaria de apresentar nossas soluções em limpeza profissional.";
   } catch (e) {
-    return "Olá! Somos da Vendas Seu Vital e temos soluções em limpeza profissional. Podemos conversar?";
+    return "Olá! Somos da Vendas Seu Vital. Temos condições especiais em materiais de limpeza para sua região. Podemos conversar?";
   }
 };
