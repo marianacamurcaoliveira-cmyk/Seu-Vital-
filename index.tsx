@@ -9,6 +9,7 @@ import { Lead, LocationData } from './types';
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [leads, setLeads] = useState<Lead[]>([]);
+  const [groundingLinks, setGroundingLinks] = useState<{title: string, uri: string}[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [region, setRegion] = useState('Minha Região');
@@ -38,6 +39,7 @@ function App() {
     try {
       const results = await searchLeads(searchQuery, region);
       setLeads(results.leads);
+      setGroundingLinks(results.groundingLinks);
       setActiveTab('crm');
     } catch (err) {
       console.error(err);
@@ -89,7 +91,7 @@ function App() {
   const perdidos = leads.filter(l => l.status === 'Perdido').length;
 
   const renderDashboard = () => (
-    <div className="space-y-8">
+    <div className="space-y-8 animate-in fade-in duration-500">
       <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
           <h2 className="text-3xl font-bold text-slate-800">Bora vender! 🚀</h2>
@@ -145,7 +147,7 @@ function App() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
-            <span className="absolute right-6 top-1/2 -translate-y-1/2 text-slate-400">🔍</span>
+            <span className="absolute right-6 top-1/2 -translate-y-1/2 text-slate-400 text-xl">🔍</span>
           </div>
           <input 
             type="text" 
@@ -166,18 +168,42 @@ function App() {
   );
 
   const renderCRM = () => (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-slate-800">Carteira de Leads</h2>
+    <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-800">Carteira de Leads</h2>
+          <p className="text-slate-500 text-sm">Gerencie suas prospecções e acompanhe o status.</p>
+        </div>
         <div className="flex gap-2">
-          <button className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50">
+          <button className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors">
             Filtros
           </button>
-          <button className="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700">
+          <button className="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm">
             Exportar CSV
           </button>
         </div>
       </div>
+
+      {groundingLinks.length > 0 && (
+        <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4">
+          <h4 className="text-xs font-bold text-blue-600 uppercase tracking-wider mb-2 flex items-center gap-2">
+            🌐 Fontes da Pesquisa:
+          </h4>
+          <div className="flex flex-wrap gap-2">
+            {groundingLinks.map((link, idx) => (
+              <a 
+                key={idx} 
+                href={link.uri} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-[11px] bg-white border border-blue-200 text-blue-700 px-3 py-1 rounded-full hover:bg-blue-100 transition-colors truncate max-w-[200px]"
+              >
+                {link.title}
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
 
       {leads.length === 0 ? (
         <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-slate-300">
@@ -192,7 +218,7 @@ function App() {
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-20">
           {leads.map(lead => (
             <LeadCard 
               key={lead.id} 
@@ -254,7 +280,7 @@ function App() {
 
               <div>
                 <h4 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-3">Mensagem de Abordagem Sugerida</h4>
-                <div className="bg-slate-50 border border-slate-200 p-6 rounded-2xl whitespace-pre-wrap text-slate-700 leading-relaxed italic">
+                <div className="bg-slate-50 border border-slate-200 p-6 rounded-2xl whitespace-pre-wrap text-slate-700 leading-relaxed italic relative">
                   "{outreachMsg}"
                 </div>
               </div>
@@ -265,7 +291,7 @@ function App() {
                     navigator.clipboard.writeText(outreachMsg);
                     alert("Copiado com sucesso!");
                   }}
-                  className="flex-1 bg-slate-800 text-white font-bold py-4 rounded-2xl hover:bg-slate-900 transition-colors"
+                  className="flex-1 bg-slate-800 text-white font-bold py-4 rounded-2xl hover:bg-slate-900 transition-colors shadow-lg"
                 >
                   Copiar Texto
                 </button>
@@ -273,7 +299,7 @@ function App() {
                   href={`https://wa.me/${selectedLead.phone?.replace(/\D/g, '')}?text=${encodeURIComponent(outreachMsg)}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex-1 bg-green-500 text-white font-bold py-4 rounded-2xl hover:bg-green-600 transition-colors text-center"
+                  className="flex-1 bg-green-500 text-white font-bold py-4 rounded-2xl hover:bg-green-600 transition-colors text-center shadow-lg"
                 >
                   Enviar WhatsApp
                 </a>
@@ -289,32 +315,32 @@ function App() {
     <div className="min-h-screen flex bg-slate-50">
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
       
-      <main className="ml-64 flex-1 p-10 min-h-screen">
+      <main className="ml-64 flex-1 p-10 min-h-screen relative">
         <div className="max-w-6xl mx-auto">
           {activeTab === 'dashboard' && renderDashboard()}
           {activeTab === 'crm' && renderCRM()}
           {activeTab === 'search' && (
-            <div className="space-y-6">
+            <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
               <h2 className="text-2xl font-bold text-slate-800">Prospecção de Clientes</h2>
               <div className="bg-white rounded-3xl p-8 border border-slate-100 shadow-sm">
                 <form onSubmit={handleSearch} className="space-y-4">
                   <div>
-                    <label className="block text-sm font-bold text-slate-500 mb-2 uppercase">Tipo de Cliente (Lead)</label>
+                    <label className="block text-sm font-bold text-slate-500 mb-2 uppercase tracking-wide">Tipo de Cliente (Lead)</label>
                     <input 
                       type="text" 
                       placeholder="Ex: Academias, Condomínios, Grandes Escritórios..."
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl py-4 px-6 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl py-4 px-6 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-lg"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                     />
                   </div>
                   <div className="flex flex-col md:flex-row gap-4">
                     <div className="flex-1">
-                      <label className="block text-sm font-bold text-slate-500 mb-2 uppercase">Região de Atuação</label>
+                      <label className="block text-sm font-bold text-slate-500 mb-2 uppercase tracking-wide">Região de Atuação</label>
                       <input 
                         type="text" 
                         placeholder="Nome da Cidade ou Bairro"
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl py-4 px-6 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl py-4 px-6 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-lg"
                         value={region}
                         onChange={(e) => setRegion(e.target.value)}
                       />
@@ -322,7 +348,7 @@ function App() {
                     <button 
                       type="submit"
                       disabled={loading}
-                      className="mt-7 bg-blue-600 hover:bg-blue-700 text-white font-bold px-10 py-4 rounded-xl transition-all disabled:opacity-50"
+                      className="mt-7 bg-orange-500 hover:bg-orange-600 text-white font-bold px-10 py-4 rounded-xl transition-all disabled:opacity-50 shadow-lg shadow-orange-500/20"
                     >
                       {loading ? 'Buscando Leads...' : 'Iniciar Busca'}
                     </button>
@@ -332,13 +358,13 @@ function App() {
             </div>
           )}
           {activeTab === 'settings' && (
-            <div className="bg-white rounded-3xl p-8 border border-slate-100 shadow-sm max-w-2xl">
+            <div className="bg-white rounded-3xl p-8 border border-slate-100 shadow-sm max-w-2xl animate-in fade-in duration-500">
               <h2 className="text-2xl font-bold text-slate-800 mb-6">Configuração de Vendas</h2>
               <div className="space-y-6">
                 <div>
-                  <label className="block text-sm font-bold text-slate-500 mb-2 uppercase">Perfil da Distribuidora (Usado na IA)</label>
+                  <label className="block text-sm font-bold text-slate-500 mb-2 uppercase tracking-wide">Perfil da Distribuidora (Usado na IA)</label>
                   <textarea 
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-4 px-6 h-40 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-4 px-6 h-40 focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-700"
                     placeholder="Descreva suas marcas e diferenciais..."
                     value={businessProfile}
                     onChange={(e) => setBusinessProfile(e.target.value)}
@@ -361,10 +387,13 @@ function App() {
       </main>
       
       {loading && (
-        <div className="fixed inset-0 bg-white/80 backdrop-blur-md z-[60] flex flex-col items-center justify-center text-center px-4">
+        <div className="fixed inset-0 bg-white/80 backdrop-blur-md z-[60] flex flex-col items-center justify-center text-center px-4 animate-in fade-in duration-300">
           <div className="w-24 h-24 border-4 border-blue-100 border-t-orange-500 rounded-full animate-spin mb-6"></div>
           <h2 className="text-2xl font-bold text-slate-800 animate-pulse">Escaneando Região...</h2>
-          <p className="text-slate-500 mt-2 max-w-sm">Localizando parceiros que buscam inovação em limpeza.</p>
+          <p className="text-slate-500 mt-2 max-w-sm">Localizando parceiros reais que buscam inovação em limpeza.</p>
+          <div className="mt-8 text-xs text-slate-400 font-medium bg-slate-100 px-4 py-2 rounded-full">
+            Consultando Google Search API & Gemini 3 Pro
+          </div>
         </div>
       )}
     </div>
