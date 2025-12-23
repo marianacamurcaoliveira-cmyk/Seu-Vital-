@@ -11,61 +11,61 @@ declare const process: {
 
 export const searchLeads = async (query: string, location?: string): Promise<SearchResult> => {
   const apiKey = process.env.API_KEY;
+  if (!apiKey) {
+    console.error("API_KEY não encontrada!");
+    return { leads: [], groundingLinks: [] };
+  }
+
   const ai = new GoogleGenAI({ apiKey });
   
-  // Prompt otimizado para busca regional no Brasil
-  const fullPrompt = `Você é um robô de prospecção de vendas B2B para a empresa "Vendas Seu Vital".
-Busque na internet por empresas REAIS do tipo "${query}" localizadas em ou perto de "${location || 'Brasil'}".
-Foque em: condomínios, hotéis, hospitais, escolas, indústrias ou comércios grandes que precisam de limpeza profissional (marcas Talimpo e Superaplast).
+  const fullPrompt = `Aja como um Agente de Prospecção de Vendas. 
+Sua tarefa é encontrar clientes REAIS (estabelecimentos comerciais, condomínios, escolas, etc) que precisem de materiais de limpeza na região de "${location || 'Brasil'}".
+Busque especificamente por: "${query}".
 
-Para cada estabelecimento encontrado, você DEVE retornar as seguintes informações:
-1. Nome oficial da empresa.
-2. Um título curto e impactante para o lead.
-3. Tipo de negócio.
-4. Bairro e Cidade.
-5. Telefone ou WhatsApp de contato (Tente encontrar números reais com DDD).
-6. Uma descrição rápida do motivo do contato.
-7. Score de 1 a 100 de quão provável é eles comprarem materiais de limpeza em atacado.
+Para cada lead encontrado, extraia:
+1. Nome do estabelecimento
+2. Título (Ex: Condomínio Premium, Hospital Público)
+3. Ramo de atividade
+4. Localização (Bairro, Cidade)
+5. Telefone ou WhatsApp de contato (ESSENCIAL)
+6. Descrição curta de por que eles são um bom lead para produtos de limpeza profissional (marcas Talimpo e Superaplast).
+7. Score de 0 a 100 de potencial de venda.
 
-RESPONDA APENAS com um bloco de código JSON seguindo EXATAMENTE este formato:
+Responda OBRIGATORIAMENTE em formato JSON puro dentro de um bloco de código:
 {
   "leads": [
     {
-      "name": "Nome da Empresa",
-      "title": "Título Curto",
+      "name": "Nome",
+      "title": "Título",
       "businessType": "Ramo",
-      "location": "Bairro, Cidade - UF",
-      "description": "Explicação do potencial",
-      "phone": "(XX) XXXXX-XXXX",
-      "score": 85
+      "location": "Localização",
+      "phone": "Telefone",
+      "description": "Explicação",
+      "score": 90
     }
   ]
 }`;
 
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-pro-preview",
+      model: "gemini-3-flash-preview", // Modelo rápido e eficiente para buscas
       contents: fullPrompt,
       config: {
         tools: [{ googleSearch: {} }],
-        // Usamos uma temperatura baixa para garantir que ele siga o formato JSON
-        temperature: 0.1,
+        temperature: 0.1
       }
     });
 
     const text = response.text || "";
-    console.debug("Resposta bruta da IA:", text);
-
-    // Extração robusta de JSON do texto (procurando blocos de código ou chaves)
-    let jsonContent = "";
-    const jsonBlockMatch = text.match(/```json\n([\s\S]*?)\n```/);
-    if (jsonBlockMatch) {
-      jsonContent = jsonBlockMatch[1];
+    
+    // Extração segura de JSON
+    let jsonStr = "";
+    const match = text.match(/\{[\s\S]*\}/);
+    if (match) {
+      jsonStr = match[0];
     } else {
-      const braceMatch = text.match(/{[\s\S]*}/);
-      if (braceMatch) {
-        jsonContent = braceMatch[0];
-      }
+      console.warn("IA não retornou JSON válido:", text);
+      return { leads: [], groundingLinks: [] };
     }
 
     const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
@@ -76,11 +76,7 @@ RESPONDA APENAS com um bloco de código JSON seguindo EXATAMENTE este formato:
         uri: chunk.web?.uri || ''
       }));
 
-    if (!jsonContent) {
-      throw new Error("Não foi possível encontrar um JSON válido na resposta da IA.");
-    }
-
-    const data = JSON.parse(jsonContent);
+    const data = JSON.parse(jsonStr);
     
     return {
       leads: (data.leads || []).map((l: any) => ({
@@ -91,7 +87,7 @@ RESPONDA APENAS com um bloco de código JSON seguindo EXATAMENTE este formato:
       groundingLinks
     };
   } catch (e) {
-    console.error("Erro na busca de leads Gemini:", e);
+    console.error("Falha na busca Gemini:", e);
     return { leads: [], groundingLinks: [] };
   }
 };
@@ -99,21 +95,22 @@ RESPONDA APENAS com um bloco de código JSON seguindo EXATAMENTE este formato:
 export const generateOutreach = async (lead: Lead, myBusiness: string): Promise<string> => {
   const apiKey = process.env.API_KEY;
   const ai = new GoogleGenAI({ apiKey });
-  const prompt = `Crie uma mensagem curta e amigável de WhatsApp para o lead "${lead.name}".
-  Atuamos na região dele: ${lead.location}.
-  
-  Nosso diferencial: Somos distribuidores diretos com fábricas próprias:
-  - TALIMPO: Químicos e saneantes de alta performance.
-  - SUPERAPLAST: Sacos de lixo super resistentes.
-  
-  Foque em INOVAÇÃO e economia na limpeza.
-  Termine pedindo para enviar o catálogo.
-  Assine sempre como: "Vital, material de limpeza".`;
+  const prompt = `Crie uma mensagem curta de WhatsApp para abordar o lead "${lead.name}" (Local: ${lead.location}).
+Falamos em nome da "Vendas Seu Vital", distribuidores de materiais de limpeza com fábricas próprias:
+- TALIMPO (Químicos/Saneantes)
+- SUPERAPLAST (Sacos de lixo)
 
-  const response = await ai.models.generateContent({
-    model: "gemini-3-flash-preview",
-    contents: prompt
-  });
+Destaque inovação, qualidade e preço de fábrica. 
+Finalize perguntando se pode enviar o catálogo em PDF.
+Assine como: "Vital, material de limpeza".`;
 
-  return response.text || "Olá, gostaria de apresentar soluções inovadoras para a limpeza do seu estabelecimento.";
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: prompt
+    });
+    return response.text || "Olá! Gostaria de apresentar soluções de limpeza de alta performance para vocês.";
+  } catch (e) {
+    return "Olá! Somos da Vendas Seu Vital e temos soluções em limpeza profissional. Podemos conversar?";
+  }
 };

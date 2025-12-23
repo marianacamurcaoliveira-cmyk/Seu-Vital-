@@ -22,27 +22,38 @@ function App() {
 
   useEffect(() => {
     if (typeof window !== 'undefined' && navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition((pos) => {
-        setLocation({
-          latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude
-        });
-      });
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setLocation({
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude
+          });
+        },
+        (err) => console.warn("Localização negada ou indisponível")
+      );
     }
   }, []);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!searchQuery) return;
+    if (!searchQuery.trim()) {
+      alert("Por favor, digite o que você está procurando (ex: Condomínios)");
+      return;
+    }
     
     setLoading(true);
     try {
       const results = await searchLeads(searchQuery, region);
-      setLeads(results.leads);
-      setGroundingLinks(results.groundingLinks);
-      setActiveTab('crm');
+      if (results.leads && results.leads.length > 0) {
+        setLeads(results.leads);
+        setGroundingLinks(results.groundingLinks);
+        setActiveTab('crm');
+      } else {
+        alert("Nenhum lead encontrado com esses termos. Tente ser mais específico.");
+      }
     } catch (err) {
-      console.error(err);
+      console.error("Erro no fluxo de busca:", err);
+      alert("Houve um erro ao realizar a busca. Verifique sua conexão ou tente novamente mais tarde.");
     } finally {
       setLoading(false);
     }
@@ -158,9 +169,10 @@ function App() {
           />
           <button 
             type="submit"
-            className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-4 px-10 rounded-2xl transition-all shadow-lg shadow-orange-500/30 text-lg flex items-center justify-center gap-2"
+            disabled={loading}
+            className="bg-orange-500 hover:bg-orange-600 disabled:bg-slate-400 text-white font-bold py-4 px-10 rounded-2xl transition-all shadow-lg shadow-orange-500/30 text-lg flex items-center justify-center gap-2"
           >
-            {loading ? 'Mapeando...' : 'Prospectar'}
+            {loading ? 'Buscando...' : 'Prospectar'}
           </button>
         </form>
       </div>
@@ -371,15 +383,6 @@ function App() {
                   />
                   <p className="text-xs text-slate-400 mt-2 italic">Dica: Mencione sempre o foco em inovação e assine como Vital.</p>
                 </div>
-                <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl">
-                  <div>
-                    <p className="font-bold text-slate-700">Otimização Geográfica</p>
-                    <p className="text-xs text-slate-500">Refina resultados baseado na sua rota de entrega</p>
-                  </div>
-                  <div className="w-12 h-6 bg-blue-600 rounded-full flex items-center px-1 cursor-pointer">
-                    <div className="w-4 h-4 bg-white rounded-full ml-auto shadow-sm"></div>
-                  </div>
-                </div>
               </div>
             </div>
           )}
@@ -392,7 +395,7 @@ function App() {
           <h2 className="text-2xl font-bold text-slate-800 animate-pulse">Escaneando Região...</h2>
           <p className="text-slate-500 mt-2 max-w-sm">Localizando parceiros reais que buscam inovação em limpeza.</p>
           <div className="mt-8 text-xs text-slate-400 font-medium bg-slate-100 px-4 py-2 rounded-full">
-            Consultando Google Search API & Gemini 3 Pro
+            Consultando Google Search API & Gemini 3 Flash
           </div>
         </div>
       )}
